@@ -7,6 +7,7 @@ function main()
 	resourcesPath="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 	log="${resourcesPath}/log.txt"
 
+	# ${parameter?err_msg}, ${parameter:?err_msg} - https://www.tldp.org/LDP/abs/html/parameter-substitution.html
 	hostname=$(getSetting "hostname") || { failMessage "Retrieving setting 'hostname'"; return 1; }
 	rootpassword=$(getSetting "rootpassword") || { failMessage "Retrieving setting 'rootpassword'"; return 1; }
 	username=$(getSetting "username") || { failMessage "Retrieving setting 'username'"; return 1; }

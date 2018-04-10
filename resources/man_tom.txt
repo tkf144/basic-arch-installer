@@ -1,0 +1,11 @@
+# Find out what device a dir is mounted on
+	df -h /boot/efi
+
+# Find out device capacities/usage
+	df -h
+
+# Ctrl+Z to suspend a job
+# Send job to background
+	bg
+# Bring job to foreground
+	fg

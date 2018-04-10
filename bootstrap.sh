@@ -2,24 +2,84 @@
 
 # MIT License Copyright (c) 2018 TKF144 https://github.com/tkf144/basic-arch-installer
 
-resources=(
-	"install.sh"
-	"configure.sh"
-	"settings.ini"
-	"workman.map"
-)
-
 function main()
 {
+	argPause=false
+	argResume=false
+
+	[[ "${#@}" < 1 ]] && printUsage "Too few arguments" && return 1
+	[[ "${#@}" > 2 ]] && printUsage "Too many arguments" && return 1
+
+	for arg in "$@"
+	do
+		case $arg in
+			--url=*)
+				argUrlPath=${arg#*=}
+				[[ -z "$argUrlPath" ]] && printUsage "Invalid --url value '${argUrlPath}'" && return 1
+				shift
+			;;
+
+			--pause)
+				argPause=true
+				shift
+			;;
+
+			--resume)
+				argResume=true
+				shift
+			;;
+
+			'-?'|--help)
+				printUsage && return 0
+			;;
+
+			*)
+				printUsage && return 1
+			;;
+		esac
+	done
+
+	# Errors: unclear/undefined behaviour
+	[[ "${argPause}" = true && "${argResume}" = true ]] && printUsage "Invalid combination of --pause and --resume" && return 1
+	[[ "${argPause}" = true && -z "${argUrlPath}" ]] && printUsage "Argument --pause requires --url" && return 1
+	[[ "${argResume}" = true && -n "${argUrlPath}" ]] && printUsage "Invalid combination of --url and --resume" && return 1
+
+	# Proceed
+	resourcesDir=$(pwd)"/installationresources"
+	[[ "$argResume" = false ]] && bootstrap "$argUrlPath" "$resourcesDir"
+	[[ "$argPause" = false ]] && initiate "$resourcesDir"
+}
+
+function cleanup()
+{
+	rm -rf $(pwd)"/installationresources"
+	logMessage $? "Removed resources directory"
+	rm log.txt "bootstrapped.tmp"
+	logMessage $? "Removed log.txt and bootstrapped.tmp flag"
+}
+
+function bootstrap()
+{
+	resources=(
+		"main.sh"
+		"install.sh"
+		"configure.sh"
+		"settings.ini"
+	)
+
 	resourcesUrl="$1"
-	resourcesPath=$(pwd)"/installationResources"
+	resourcesPath="$2"
 	log=$(pwd)"/log.txt"
 
+	[[ -e "bootstrapped.tmp" ]] && failMessage "Bootstrap already complete. See bootstrap.sh --help." && return 1
+
+	touch "bootstrapped.tmp"
+
 	touch $log > /dev/null
-	logMessage $? "Created log file '${log}'"
+	logMessage $? "Created log file '${log}'" || return 1
 
 	mkdir ${resourcesPath} >> $log 2>&1
-	logMessage $? "Created resources path '${resourcesPath}'"
+	logMessage $? "Created resources directory '${resourcesPath}'" || return 1
 
 	for resource in "${resources[@]}"; do
 		wget -qO "${resourcesPath}/${resource}" "${resourcesUrl}/${resource}" >> $log 2>&1
@@ -27,11 +87,49 @@ function main()
 	done
 
 	chmod 755 ${resourcesPath}/*.sh >> $log 2>&1
-	logMessage $? "Set resource files executable"
+	logMessage $? "Set resource files executable" || return 1
 
-	successMessage "Bootstrap complete; retrieved resources and handed off to install.sh\n"
 
-	. "${resourcesPath}/install.sh" "${resourcesPath}" "${log}"
+	successMessage "Bootstrap complete"
+}
+
+function initiate()
+{
+	[[ ! -e "${resourcesPath}/bootstrapped.tmp" ]] && printUsage "Cannot resume without first initiating bootstrap" && return 1
+
+	successMessage "Initiating installation"
+
+	resourcesPath="$1"
+	. "${resourcesPath}/main.sh" "${resourcesPath}" "${log}"
+}
+
+
+function printUsage()
+{
+	[[ ! -z "${@}" ]] && echo -e "Error: ${@}\n"
+
+	cat <<"EOF"
+Basic Arch Installer - Bootstrap 
+Retrieve install resources and initiate installation of Arch Linux
+
+Usage:
+	bootstrap.sh --url=RESOURCES_URL
+		Download resources from --url and initiate installation
+
+	OR
+
+	bootstrap.sh --url=RESOURCES_URL --pause
+		Only download resources from --url
+	bootstrap.sh --resume
+		Only initiate installation
+
+  --url=<URL>	The URL that bootstrap.sh will retrieve resources from
+  --pause 	Pause bootstrap after download; don't initiate installation (requires --url)
+  --resume  	Resume bootstrap after pause; only initiate installation
+  -?, --help  	Print this usage info
+
+MIT License Copyright (c) 2018 TKF144 https://github.com/tkf144/basic-arch-installer
+EOF
 }
 
 function logMessage()
@@ -68,7 +166,7 @@ function failMessage()
 
 function tentativeMessage()
 {
-	echo -n -e "[      ] ${1}.."
+	echo -n -e "[	  ] ${1}.."
 
 	return 0
 }
@@ -99,4 +197,6 @@ export -f failMessage
 export -f tentativeMessage
 export -f getSetting
 
-main "$@"
+main "$@" \
+	&& successMessage "Bootstrapped and initiated installation" \
+	|| { failMessage "Bootstrapped and initiated installation"; cleanup; }
