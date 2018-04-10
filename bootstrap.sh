@@ -46,7 +46,7 @@ function main()
 
 	# Proceed
 	resourcesDir=$(pwd)"/installationresources"
-	[[ "$argResume" = false ]] && bootstrap "$argUrlPath" "$resourcesDir"
+	[[ "$argResume" = false ]] && bootstrap "$argUrlPath" "$resourcesDir" || logMessage $? "Bootstrapped installer" || return 1
 	[[ "$argPause" = false ]] && initiate "$resourcesDir"
 }
 
@@ -71,7 +71,7 @@ function bootstrap()
 	resourcesPath="$2"
 	log=$(pwd)"/log.txt"
 
-	[[ -e "bootstrapped.tmp" ]] && failMessage "Bootstrap already complete. See bootstrap.sh --help." && return 1
+	[[ -e "bootstrapped.tmp" ]] && failMessage "Bootstrap already initiated. See bootstrap.sh --help." && return 1
 
 	touch "bootstrapped.tmp"
 
@@ -95,7 +95,7 @@ function bootstrap()
 
 function initiate()
 {
-	[[ ! -e "${resourcesPath}/bootstrapped.tmp" ]] && printUsage "Cannot resume without first initiating bootstrap" && return 1
+	[[ ! -e "bootstrapped.tmp" ]] && printUsage "Cannot resume without first initiating bootstrap" && return 1
 
 	successMessage "Initiating installation"
 
